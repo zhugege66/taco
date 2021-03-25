@@ -3,6 +3,7 @@ package zhugege.cn.tacocloud.java8.method;
 import java.awt.*;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Queue;
 import java.util.Random;
 import java.util.concurrent.*;
 import java.util.stream.Collectors;
@@ -27,16 +28,12 @@ public class method_15 {
         long retrievalTime = (System.nanoTime() - start) / 1_000_000;
         System.out.println("price return after " + retrievalTime + " ms");
 
-        shopList = Arrays.asList(new Shop("Best Price"),
-                new Shop("LetsSaveBig"),
-                new Shop("MyFavoriteShop"),
-                new Shop("BuyItAll"),
+        shopList = Arrays.asList(
                 new Shop("test1"),
                 new Shop("test2"),
                 new Shop("test3"),
                 new Shop("test4"),
-                new Shop("test5"),
-                new Shop("test6"));
+                new Shop("test5"));
 
         start = System.nanoTime();
         findPriceStream("iphone").forEach(System.out::println);
@@ -52,6 +49,11 @@ public class method_15 {
         findPriceFuture("iphone").forEach(System.out::println);
         duringTime = (System.nanoTime() - start) / 1_000_000;
         System.out.println("Done in findPriceFuture " + duringTime + " ms");
+
+        start = System.nanoTime();
+        findPriceBase("iphone").forEach(System.out::println);
+        duringTime = (System.nanoTime() - start) / 1_000_000;
+        System.out.println("Done in findPriceBase " + duringTime + " ms");
     }
 
     public static List<String> findPriceStream(String product){
@@ -87,6 +89,14 @@ public class method_15 {
                 .collect(Collectors.toList());
     }
 
+    public static List<String> findPriceBase(String product){
+        return shopList.stream()
+                .map(shop -> shop.getPrice(product))
+                .map(Quote::parse)
+                .map(Discount::applyDiscount)
+                .collect(Collectors.toList());
+    }
+
 }
 
 class Shop{
@@ -111,12 +121,21 @@ class Shop{
         return future;
     }
 
+    public String getPrice(String product){
+
+        double price = calculatePrice(product);
+        Discount.Code code = Discount.Code.values()[
+                new Random().nextInt(Discount.Code.values().length)];
+        return String.format("%s:%.2f:%s",name,price,code);
+
+    }
+
     public double calculatePrice(String product){
         delay(1);
         return new Random().nextDouble() * product.charAt(0) + product.charAt(0);
     }
 
-    public void delay(int second){
+    public static void delay(int second){
 
         try {
             Thread.sleep(second*1000);
@@ -126,13 +145,44 @@ class Shop{
     }
 }
 
+class Quote{
 
+    private final String shopName;
+    private final double price;
+    private final Discount.Code discountCode;
+
+    public Quote(String shopName, double price, Discount.Code discountCode){
+        this.shopName = shopName;
+        this.price = price;
+        this.discountCode = discountCode;
+    }
+
+    public static Quote parse(String s){
+        String[] stringParse = s.split(":");
+        String shopName = stringParse[0];
+        double price = Double.parseDouble(stringParse[1]);
+        Discount.Code discountCode = Discount.Code.valueOf(stringParse[2]);
+        return new Quote(shopName,price,discountCode);
+    }
+
+    public String getShopName() {
+        return shopName;
+    }
+
+    public double getPrice() {
+        return price;
+    }
+
+    public Discount.Code getDiscountCode() {
+        return discountCode;
+    }
+}
 
 
 
 class Discount{
 
-    enum Code{
+    public enum Code{
         NONE(0), SILVER(5), GOLD(10), PLATINUM(15), DIAMOND(20);
         
         private final int percentage;
@@ -142,9 +192,13 @@ class Discount{
         }
     }
 
-    public static double apply(double price){
+    public static String applyDiscount(Quote quote){
+        return quote.getShopName() + " price is " + apply(quote.getPrice(),quote.getDiscountCode());
+    }
 
-        return 1;
+    public static double apply(double price, Code code){
+        Shop.delay(1);
+        return price * (100 - code.percentage) / 100;
     }
 
 }
