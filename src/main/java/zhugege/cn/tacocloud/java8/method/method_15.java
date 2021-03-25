@@ -142,6 +142,9 @@ class Discount{
         }
     }
 
-    public static double apply(double price, )
+    public static double apply(double price){
+
+        return 1;
+    }
 
 }
