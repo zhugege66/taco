@@ -1,9 +1,7 @@
 package zhugege.cn.tacocloud.java8.method;
 
-import java.awt.*;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Queue;
 import java.util.Random;
 import java.util.concurrent.*;
 import java.util.stream.Collectors;
@@ -54,6 +52,11 @@ public class method_15 {
         findPriceBase("iphone").forEach(System.out::println);
         duringTime = (System.nanoTime() - start) / 1_000_000;
         System.out.println("Done in findPriceBase " + duringTime + " ms");
+
+        start = System.nanoTime();
+        findPriceBase2("iphone").forEach(System.out::println);
+        duringTime = (System.nanoTime() - start) / 1_000_000;
+        System.out.println("Done in findPriceBase2 " + duringTime + " ms");
     }
 
     public static List<String> findPriceStream(String product){
@@ -69,7 +72,7 @@ public class method_15 {
                 .collect(Collectors.toList());
     }
 
-    public static List<String> findPriceFuture(String product){
+    public static Executor getExecutor(){
 
         final Executor executor = Executors.newFixedThreadPool(Math.min(shopList.size(), 100), new ThreadFactory() {
             @Override
@@ -79,9 +82,13 @@ public class method_15 {
                 return t;
             }
         });
+        return executor;
+    }
+
+    public static List<String> findPriceFuture(String product){
 
         List<CompletableFuture<String>> futurePrice = shopList.stream()
-                .map(shop -> CompletableFuture.supplyAsync(() -> shop.name + "price is " + shop.calculatePrice(product),executor))
+                .map(shop -> CompletableFuture.supplyAsync(() -> shop.name + "price is " + shop.calculatePrice(product),getExecutor()))
                 .collect(Collectors.toList());
 
         return futurePrice.stream()
@@ -94,6 +101,19 @@ public class method_15 {
                 .map(shop -> shop.getPrice(product))
                 .map(Quote::parse)
                 .map(Discount::applyDiscount)
+                .collect(Collectors.toList());
+    }
+
+    public static List<String> findPriceBase2(String product){
+        List<CompletableFuture<String>> futurePrice = shopList.stream()
+                .map(shop -> CompletableFuture.supplyAsync(() -> shop.getPrice(product),getExecutor()))
+                .map(future -> future.thenApply(Quote::parse))
+                .map(future -> future.thenCompose(
+                        quote -> CompletableFuture.supplyAsync(() -> Discount.applyDiscount(quote),getExecutor())))
+                .collect(Collectors.toList());
+
+        return futurePrice.stream()
+                .map(CompletableFuture::join)
                 .collect(Collectors.toList());
     }
 
