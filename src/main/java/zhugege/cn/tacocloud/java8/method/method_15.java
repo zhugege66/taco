@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Random;
 import java.util.concurrent.*;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public class method_15 {
 
@@ -33,6 +34,8 @@ public class method_15 {
                 new Shop("test4"),
                 new Shop("test5"));
 
+        Shop[] shops = shopList.toArray(new Shop[5]);
+
         start = System.nanoTime();
         findPriceStream("iphone").forEach(System.out::println);
         long duringTime = (System.nanoTime() - start) / 1_000_000;
@@ -57,6 +60,14 @@ public class method_15 {
         findPriceBase2("iphone").forEach(System.out::println);
         duringTime = (System.nanoTime() - start) / 1_000_000;
         System.out.println("Done in findPriceBase2 " + duringTime + " ms");
+
+        long finalStart = System.nanoTime();
+        CompletableFuture[] future = streamFindPrice("iphone")
+                .map(f -> f.thenAccept(
+                        s -> System.out.println(s + "(done in " + (System.nanoTime() - finalStart) / 1_000_000 + " ms)")))
+                .toArray(size -> new CompletableFuture[size]);
+        CompletableFuture.allOf(future).join();
+
     }
 
     public static List<String> findPriceStream(String product){
@@ -117,6 +128,13 @@ public class method_15 {
                 .collect(Collectors.toList());
     }
 
+    public static Stream<CompletableFuture<String>> streamFindPrice(String product){
+        return shopList.stream()
+                .map(shop -> CompletableFuture.supplyAsync(() -> shop.getPrice(product),getExecutor()))
+                .map(future -> future.thenApply(Quote::parse))
+                .map(future -> future.thenCompose(quote ->
+                        CompletableFuture.supplyAsync(() -> Discount.applyDiscount(quote),getExecutor())));
+    }
 }
 
 class Shop{
@@ -151,7 +169,7 @@ class Shop{
     }
 
     public double calculatePrice(String product){
-        delay(1);
+        randomDelay();
         return new Random().nextDouble() * product.charAt(0) + product.charAt(0);
     }
 
@@ -159,6 +177,15 @@ class Shop{
 
         try {
             Thread.sleep(second*1000);
+        }catch (Exception e){
+            e.printStackTrace();
+        }
+    }
+
+    public static void randomDelay(){
+        int delay = 500 + new Random().nextInt(2000);
+        try {
+            Thread.sleep(delay);
         }catch (Exception e){
             e.printStackTrace();
         }
